@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 // Calculates heart rate from gyroscope and accelerometer samples
 
-public class HeartRateAlgorithm : MonoBehaviour
+public class HeartRateCalculator : MonoBehaviour
 {
     private const int DetrendWindowSize = 128;
     public static double Analyze(List<Vector3> accel, List<Vector3> gyro)
