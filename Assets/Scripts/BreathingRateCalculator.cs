@@ -17,6 +17,7 @@ public class BreathingRateCalculator : MonoBehaviour
         {
             data[i] = new double[sampleSize];
         }
+
         for (int i = 0; i < sampleSize; i++)
         {
             data[0][i] = accel[i].x;
@@ -27,17 +28,28 @@ public class BreathingRateCalculator : MonoBehaviour
             data[5][i] = gyro[i].z;
         }
 
+        // Check if gyroscope is completely 0;
+		bool gyroInvalid = true;
+		for (int i = 0; i < sampleSize; i++)
+        {
+			gyroInvalid = gyroInvalid && (data[3][i] == 0 && data[4][i] == 0 && data[5][i] == 0);
+		}
 
-        for (int i = 0; i < 6; i++)
+        // Assumes accelerometer is always valid,
+        // but gyroscope can be discarded
+        int signalCount = gyroInvalid ? 3 : 6;
+
+
+        for (int i = 0; i < signalCount; i++)
         {
             PreprocessSignal(data[i]);
         }
 
-        // Run ICA (using external C# Accord library) 
-        data = SignalHelper.IndependentComponentAnalysis(data, sampleSize - LowPassRespirationFilter.Length);
+        // Run ICA (using external C# Accord library)
+        data = SignalHelper.IndependentComponentAnalysis(data, signalCount, sampleSize - LowPassRespirationFilter.Length);
 
         // Run FFT (using external C# Accord library) to find the strongest signal within respiration rate ranges
-        for (int i = 0; i < 6; i++)
+        for (int i = 0; i < signalCount; i++)
         {
             data[i] = SignalHelper.FastFourierTransform(data[i], data[i].Length);
         }
@@ -45,7 +57,7 @@ public class BreathingRateCalculator : MonoBehaviour
 
         double maxConfidence = 0.0;
         double maxConfidenceFrequency = 0.0;
-        for (int i = 0; i < 6; i++)
+        for (int i = 0; i < signalCount; i++)
         {
             int index = SignalHelper.ExtractRate(data[i], 8.0, 45.0);
             if (data[i][index] >= maxConfidence)

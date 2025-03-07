@@ -20,7 +20,7 @@ public class SignalHelper : MonoBehaviour
 		}
 		return average / sample.Length;
 	}
-	
+
 	public static double StandardDeviation(double[] sample) {
 		double average = Average(sample);
 		double stdev = 0.0;
@@ -29,7 +29,7 @@ public class SignalHelper : MonoBehaviour
 		}
 		return Math.Sqrt(stdev / sample.Length);
 	}
-	
+
 	// Removes overall patterns in a signal, such as subtly increasing
 	// or decreasing over time. A good windowSize requires some experimentation,
 	// but 1/8 - 1/16 of the sample size is a good rule of thumb
@@ -48,18 +48,22 @@ public class SignalHelper : MonoBehaviour
 		}
 		return output;
 	}
-	
+
 	// Sets the mean and standard deviation of a signal to 0 and 1 respectively
 	public static void Normalize(double[] sample) {
 		double average = Average(sample);
 		double stdev = StandardDeviation(sample);
 		for (int i = 0; i < sample.Length; i++) {
 			sample[i] -= average;
-			sample[i] /= stdev;
+
+			// Prevents samples from blowing up or becoming NaN
+			if (stdev > 0.01) {
+				sample[i] /= stdev;
+			}
 		}
-	} 
-	
-	// Applies a Finite Impulse Response (FIR) filter to 
+	}
+
+	// Applies a Finite Impulse Response (FIR) filter to
 	// isolate frequency ranges in the signal
 	public static double[] ApplyFirFilter(double[] sample, double[] filter) {
 		double[] output = new double[sample.Length - filter.Length];
@@ -72,51 +76,51 @@ public class SignalHelper : MonoBehaviour
 		}
 		return output;
 	}
-	
-	public static double[][] TransposeMatrix(double[][] data, int sampleSize) {
-		double[][] transposedData = new double[sampleSize][];
-		for (int i = 0; i < sampleSize; i++) {
-			transposedData[i] = new double[data.Length];
+
+	public static double[][] TransposeMatrix(double[][] data, int n, int m) {
+		double[][] transposedData = new double[m][];
+		for (int i = 0; i < m; i++) {
+			transposedData[i] = new double[n];
 		}
-		
-		for (int i = 0; i < sampleSize; i++) {
-			for (int j = 0; j < data.Length; j++) {
+
+		for (int i = 0; i < m; i++) {
+			for (int j = 0; j < n; j++) {
 				transposedData[i][j] = data[j][i];
 			}
 		}
-		
+
 		return transposedData;
 	}
-	
+
 	// Isolates correlated signals into clean possible components
-	public static double[][] IndependentComponentAnalysis(double[][] samples, int sampleSize) {
+	public static double[][] IndependentComponentAnalysis(double[][] samples, int signalCount, int sampleSize) {
 		// Accord.NET expects each column to be an input to ICA,
 		// while the rest of this program expects each row
 		// to be a signal
-		double[][] transposedSamples = TransposeMatrix(samples, sampleSize);
-		
+		double[][] transposedSamples = TransposeMatrix(samples, signalCount, sampleSize);
+
 		IndependentComponentAnalysis ica = new IndependentComponentAnalysis();
 		MultivariateLinearRegression demix = ica.Learn(transposedSamples);
 		double[][] transposedResult = demix.Transform(transposedSamples);
-		
-		return TransposeMatrix(transposedResult, 6);
+
+		return TransposeMatrix(transposedResult, transposedSamples.Length, transposedSamples[0].Length);
 	}
-	
+
 	public static double[] FastFourierTransform(double[] signal, int sampleSize) {
 		double[] realComponent = new double[sampleSize];
 		double[] complexComponent = new double[sampleSize];
 		Array.Copy(signal, 0, realComponent, 0, sampleSize);
-		
+
 		FourierTransform2.FFT(realComponent, complexComponent, FourierTransform.Direction.Forward);
-		
+
 		for (int i = 0; i < sampleSize; i++) {
 			realComponent[i] = Math.Sqrt(realComponent[i] * realComponent[i] + complexComponent[i] * complexComponent[i]);
 		}
-		
+
 		return realComponent;
 	}
-	
-	// Finds the index within the Fourier transform corresponding to the highest amplitude 
+
+	// Finds the index within the Fourier transform corresponding to the highest amplitude
 	// within the given frequency range (in beats per minute).
 	public static int ExtractRate(double[] fft, double minBeatsPerMin, double maxBeatsPerMin) {
 		double maxAmplitude = 0.0;
