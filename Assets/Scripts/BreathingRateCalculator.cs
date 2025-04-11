@@ -5,81 +5,12 @@ using System.Collections.Generic;
 
 public class BreathingRateCalculator : MonoBehaviour
 {
-    private const int DetrendWindowSize = 128;
 
-    public static double Analyze(List<Vector3> accel, List<Vector3> gyro)
+    // Returns breathing rate (bpm), and the confidence [0, 1 and kurtosis [-inf, inf] of the measurement
+    // Confidence is not very useful, but included for future-proofing; High kurtosis is most indicative of a clean signal
+    public static (double, double, double) Analyze(List<Vector3> accel, List<Vector3> gyro)
     {
-        int sampleSize = accel.Count;
-
-        // Load data into arrays
-        double[][] data = new double[6][];
-        for (int i = 0; i < 6; i++)
-        {
-            data[i] = new double[sampleSize];
-        }
-
-        for (int i = 0; i < sampleSize; i++)
-        {
-            data[0][i] = accel[i].x;
-            data[1][i] = accel[i].y;
-            data[2][i] = accel[i].z;
-            data[3][i] = gyro[i].x;
-            data[4][i] = gyro[i].y;
-            data[5][i] = gyro[i].z;
-        }
-
-        // Check if gyroscope is completely 0;
-		bool gyroInvalid = true;
-		for (int i = 0; i < sampleSize; i++)
-        {
-			gyroInvalid = gyroInvalid && (data[3][i] == 0 && data[4][i] == 0 && data[5][i] == 0);
-		}
-
-        // Assumes accelerometer is always valid,
-        // but gyroscope can be discarded
-        int signalCount = gyroInvalid ? 3 : 6;
-
-
-        for (int i = 0; i < signalCount; i++)
-        {
-            PreprocessSignal(data[i]);
-        }
-
-        // Run ICA (using external C# Accord library)
-        data = SignalHelper.IndependentComponentAnalysis(data, signalCount, sampleSize - LowPassRespirationFilter.Length);
-
-        // Run FFT (using external C# Accord library) to find the strongest signal within respiration rate ranges
-        for (int i = 0; i < signalCount; i++)
-        {
-            data[i] = SignalHelper.FastFourierTransform(data[i], data[i].Length);
-        }
-
-
-        double maxConfidence = 0.0;
-        double maxConfidenceFrequency = 0.0;
-        for (int i = 0; i < signalCount; i++)
-        {
-            int index = SignalHelper.ExtractRate(data[i], 8.0, 45.0);
-            if (data[i][index] >= maxConfidence)
-            {
-                maxConfidence = data[i][index];
-                maxConfidenceFrequency = 60.0 / data[i].Length * index;
-            }
-        }
-        return maxConfidenceFrequency * 60.0;
-    }
-
-    private static void PreprocessSignal(double[] signal)
-    {
-        // Use a sliding window average to detrend the samples
-        double[] detrendedSignal = SignalHelper.Detrend(signal, DetrendWindowSize);
-
-        // Set mean and variance to 0 (z-scoring)
-        SignalHelper.Normalize(detrendedSignal);
-
-        // [not in paper] Use a low pass filter to isolate signals < 1 Hz
-        double[] filteredSignal = SignalHelper.ApplyFirFilter(detrendedSignal, LowPassRespirationFilter);
-        filteredSignal.CopyTo(signal, 0);
+        return SignalHelper.FindRate(accel, gyro, 8, 45, LowPassRespirationFilter);
     }
 
     public static int GetActualSampleSize(int outputSampleSize)

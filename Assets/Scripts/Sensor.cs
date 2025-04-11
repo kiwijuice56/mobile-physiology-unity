@@ -14,11 +14,16 @@ public class Sensor : MonoBehaviour
     private List<Vector3> gyro = new List<Vector3>();
     
     // Output values
-    private double heart_rate_bpm;
-    private double breath_rate_bpm;
+    private double heartRateBpm;
+    private double heartRateConfidence;
+    private double heartRateKurtosis;
 
-    bool heart_rate_done = false;
-    bool breath_rate_done = false;
+    private double breathRateBpm;
+    private double breathRateConfidence;
+    private double breathRateKurtosis;
+
+    bool heartRateDone = false;
+    bool breathRateDone = false;
 
     void Start()
     {
@@ -30,6 +35,9 @@ public class Sensor : MonoBehaviour
         accel.Add(Input.acceleration);
         gyro.Add(Input.gyro.rotationRate);
 
+        Debug.Log(Input.acceleration);
+        Debug.Log(Input.gyro.rotationRate);
+
         // Note: since some samples are chopped off while filtering, we need to 
         // collect slightly more than our target power-of-2 sample size
 
@@ -38,21 +46,21 @@ public class Sensor : MonoBehaviour
         // Once enough data is collected, calculate the heart rate
         if (accel.Count == HeartRateCalculator.GetActualSampleSize(2048)) 
         {
-            heart_rate_bpm = HeartRateCalculator.Analyze(accel, gyro);
-            heart_rate_done = true;
+            (heartRateBpm, heartRateConfidence, heartRateKurtosis) = HeartRateCalculator.Analyze(accel, gyro);
+            heartRateDone = true;
         }
 
         // Same for breath rate
         if (accel.Count == BreathingRateCalculator.GetActualSampleSize(2048))
         {
-            breath_rate_bpm = BreathingRateCalculator.Analyze(accel, gyro);
-            breath_rate_done = true;
+            (breathRateBpm, breathRateConfidence, breathRateKurtosis) = BreathingRateCalculator.Analyze(accel, gyro);
+            breathRateDone = true;
         }
 
         // Once both values are calculated, display them
-        if (heart_rate_done && breath_rate_done) 
+        if (heartRateDone && breathRateDone) 
         {
-            output.GetComponent<Text>().text = $"HR: {heart_rate_bpm}\nBR: {breath_rate_bpm}";  
+            output.GetComponent<Text>().text = $"HR: {heartRateBpm}\nKurtosis: {heartRateKurtosis}\nBR: {breathRateBpm}\nKurtosis: {breathRateKurtosis}";  
         }
     }
 }
